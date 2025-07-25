@@ -1,35 +1,3 @@
-package WordList::Password::10Million::Top100000;
-
-# AUTHORITY
-# DATE
-# DIST
-# VERSION
-
-use parent qw(WordList);
-
-use Role::Tiny::With;
-with 'WordListRole::RandomSeekPick';
-
-our $SORT = 'popularity';
-
-# STATS
-
-1;
-# ABSTRACT: Top 100,000 passwords from 10_million_password_list
-
-=head1 DESCRIPTION
-
-Source:
-L<https://github.com/danielmiessler/SecLists/blob/master/Passwords/10_million_password_list_top_100000.txt>
-(retrieved 2018-02-20).
-
-Wordlist is sorted by popularity (most popular first).
-
-Uses random-seek pick(), which gives higher probabililty to longer words.
-
-=cut
-
-__DATA__
 123456
 password
 12345678
