@@ -1,9 +1,20 @@
 import argparse
-import sys
 import time
 import multiprocessing as mp
 from hash_detector import detectar_tipo_hash
 from paralelismo import executar_paralelismo, verificar_dependencias
+from time import sleep
+
+print('''
+
+
+
+''')
+print('═'*40)
+print('Iniciando o verificador de hash...\n')
+sleep(3)
+
+
 
 def main():
     parser = argparse.ArgumentParser(description='Verificador de hash seguro e realista para wordlist.')
@@ -17,26 +28,29 @@ def main():
     num_processos = args.processos
 
     detector = detectar_tipo_hash(hash_alvo)
-    print(f'Tipo de hash detectado: {detector}')
     
     # Verifica se o formato do hash é inválido
     if detector == "Formato inválido de hash":
-        print("[ERRO] Formato inválido de hash") 
-        sys.exit(1)
-    
+        print("  [\033[31mERRO\033[0m] Formato inválido de hash") 
+        exit()
     # Verifica se o hash é desconhecido ou não suportado
     if detector == "Hash desconhecida ou não suportada":
-        print("[ERRO] Hash desconhecida ou não suportada")
-        sys.exit(1)
-    
-    print(f'Usando {num_processos} processos')
+        print("  [\033[31mERRO\033[0m] Hash desconhecida ou não suportada")
+        exit()
 
+    print(f'  [\033[32mINFO\033[0m] Tipo de hash detectado: \033[33m{detector}\033[0m')
+
+    print(f'  [\033[32mINFO\033[0m] Hash a ser quebrado: \033[33m{hash_alvo}\033[0m')
+
+    print(f'  [\033[32mINFO\033[0m] Usando \033[33m{num_processos}\033[0m processos')
+    print('═'*40)
+    sleep(3)
     # Verifica dependências
     try:
         verificar_dependencias(detector)
     except ImportError as e:
-        print(f"[ERRO] {e}")
-        sys.exit(1)
+        print(f"[\033[31mERRO\033[0m] {e}")
+        exit()
 
     start_time = time.time()
     
@@ -62,9 +76,9 @@ def main():
         print('╚' + '═'*28 + '╝')
         
     except FileNotFoundError as e:
-        print(f"[ERRO] {e}")
+        print(f"[\033[31mERRO\033[0m] {e}")
     except Exception as e:
-        print(f"[ERRO] {e}")
+        print(f"[\033[31mERRO\033[0m] {e}")
 
 if __name__ == '__main__':
     main()
