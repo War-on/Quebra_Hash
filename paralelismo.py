@@ -1,5 +1,7 @@
 import hashlib
 import multiprocessing as mp
+import chardet
+import os
 
 # Novas libs para hashes seguros
 try:
@@ -14,6 +16,84 @@ try:
     import scrypt
 except ImportError:
     scrypt = None
+
+def detectar_codificacao(arquivo_path):
+    """Detecta a codificação do arquivo automaticamente"""
+    try:
+        # Lê uma amostra do arquivo para detectar a codificação
+        with open(arquivo_path, 'rb') as file:
+            amostra = file.read(10000)  # Lê os primeiros 10KB
+            resultado = chardet.detect(amostra)
+            return resultado['encoding'] or 'utf-8'
+    except Exception:
+        return 'utf-8'
+
+def dividir_wordlist(wordlist_path, num_processos):
+    """Divide a wordlist em chunks para processamento paralelo com suporte a arquivos grandes"""
+    try:
+        # Detecta a codificação do arquivo
+        codificacao = detectar_codificacao(wordlist_path)
+        print(f"Detectada codificação: {codificacao}")
+        
+        # Para arquivos muito grandes, processa em chunks menores
+        tamanho_arquivo = os.path.getsize(wordlist_path)
+        tamanho_maximo_memoria = 100 * 1024 * 1024  # 100MB
+        
+        if tamanho_arquivo > tamanho_maximo_memoria:
+            print(f"Arquivo muito grande ({tamanho_arquivo / (1024*1024):.1f}MB). Processando em chunks...")
+            return dividir_wordlist_grande(wordlist_path, num_processos, codificacao)
+        else:
+            # Para arquivos menores, carrega tudo na memória
+            return dividir_wordlist_pequeno(wordlist_path, num_processos, codificacao)
+            
+    except Exception as e:
+        print(f"Erro ao processar arquivo: {e}")
+        # Fallback para UTF-8
+        return dividir_wordlist_pequeno(wordlist_path, num_processos, 'utf-8')
+
+def dividir_wordlist_pequeno(wordlist_path, num_processos, codificacao):
+    """Processa arquivos pequenos carregando tudo na memória"""
+    try:
+        with open(wordlist_path, 'r', encoding=codificacao, errors='ignore') as file:
+            linhas = file.readlines()
+    except UnicodeDecodeError:
+        # Se falhar, tenta com UTF-8
+        with open(wordlist_path, 'r', encoding='utf-8', errors='ignore') as file:
+            linhas = file.readlines()
+    
+    # Remove linhas vazias e espaços em branco
+    linhas = [linha.strip() for linha in linhas if linha.strip()]
+    
+    tamanho_chunk = max(1, len(linhas) // num_processos)
+    chunks = []
+    for i in range(num_processos):
+        inicio = i * tamanho_chunk
+        fim = inicio + tamanho_chunk if i < num_processos - 1 else len(linhas)
+        chunks.append(linhas[inicio:fim])
+    return chunks
+
+def dividir_wordlist_grande(wordlist_path, num_processos, codificacao):
+    """Processa arquivos grandes dividindo em chunks menores"""
+    chunks = [[] for _ in range(num_processos)]
+    chunk_atual = 0
+    
+    try:
+        with open(wordlist_path, 'r', encoding=codificacao, errors='ignore') as file:
+            for linha in file:
+                palavra = linha.strip()
+                if palavra:  # Ignora linhas vazias
+                    chunks[chunk_atual].append(palavra)
+                    chunk_atual = (chunk_atual + 1) % num_processos
+    except UnicodeDecodeError:
+        # Se falhar, tenta com UTF-8
+        with open(wordlist_path, 'r', encoding='utf-8', errors='ignore') as file:
+            for linha in file:
+                palavra = linha.strip()
+                if palavra:  # Ignora linhas vazias
+                    chunks[chunk_atual].append(palavra)
+                    chunk_atual = (chunk_atual + 1) % num_processos
+    
+    return chunks
 
 def processar_chunk(chunk_data):
     """Processa um chunk de palavras em paralelo"""
@@ -64,18 +144,6 @@ def processar_chunk(chunk_data):
                 continue
     return (False, None, total_testes)
 
-def dividir_wordlist(wordlist_path, num_processos):
-    """Divide a wordlist em chunks para processamento paralelo"""
-    with open(wordlist_path, 'r', encoding='utf-8') as file:
-        linhas = file.readlines()
-    tamanho_chunk = len(linhas) // num_processos
-    chunks = []
-    for i in range(num_processos):
-        inicio = i * tamanho_chunk
-        fim = inicio + tamanho_chunk if i < num_processos - 1 else len(linhas)
-        chunks.append(linhas[inicio:fim])
-    return chunks
-
 def executar_paralelismo(hash_alvo, detector, wordlist, num_processos):
     """Executa o processamento paralelo e retorna os resultados"""
     try:
@@ -103,9 +171,14 @@ def executar_paralelismo(hash_alvo, detector, wordlist, num_processos):
 
 def verificar_dependencias(detector):
     """Verifica se as dependências necessárias estão instaladas"""
+    try:
+        import chardet
+    except ImportError:
+        raise ImportError("Instale a biblioteca 'chardet' para detecção de codificação: pip install chardet")
+    
     if detector == "BCRYPT" and not bcrypt:
         raise ImportError("Instale a biblioteca 'bcrypt' para suporte a bcrypt: pip install bcrypt")
     if detector == "ARGON2" and not PasswordHasher:
         raise ImportError("Instale a biblioteca 'argon2-cffi' para suporte a Argon2: pip install argon2-cffi")
     if detector == "SCRYPT" and not scrypt:
-        raise ImportError("Instale a biblioteca 'scrypt' para suporte a scrypt: pip install scrypt") 
+        raise ImportError("Instale a biblioteca 'scrypt' para suporte a scrypt: pip install scrypt")
